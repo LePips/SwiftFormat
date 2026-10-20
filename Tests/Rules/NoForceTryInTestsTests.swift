@@ -127,6 +127,32 @@ final class NoForceTryInTestsTests: XCTestCase {
         testFormatting(for: input, output, rule: .noForceTryInTests)
     }
 
+    func testPreservesTypedThrows() {
+        let input = """
+        import Testing
+
+        @Test func something() throws(MyError) {
+            try! somethingThatThrows()
+        }
+
+        @Test func somethingAsync() async throws(MyError) {
+            try! await somethingThatThrows()
+        }
+        """
+        let output = """
+        import Testing
+
+        @Test func something() throws(MyError) {
+            try somethingThatThrows()
+        }
+
+        @Test func somethingAsync() async throws(MyError) {
+            try await somethingThatThrows()
+        }
+        """
+        testFormatting(for: input, output, rule: .noForceTryInTests, options: .init(swiftVersion: "6.0"))
+    }
+
     func testTestCaseIsUpdated_for_multiple_try_exclamationMarks() {
         let input = """
         import Testing

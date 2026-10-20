@@ -218,8 +218,9 @@ extension TypeDeclaration {
 
             // Convert any test case method to a @Test method
             if methodName.hasPrefix("test") {
-                let arguments = formatter.parseFunctionDeclarationArguments(startOfScope: startOfParameters)
-                guard arguments.isEmpty else { continue }
+                guard let functionDecl = formatter.parseFunctionDeclaration(keywordIndex: instanceMethod.keywordIndex),
+                      functionDecl.arguments.isEmpty
+                else { continue }
 
                 // In Swift Testing, idiomatic test case names don't start with "test".
                 formatter.removeTestPrefix(fromFunctionAt: instanceMethod.keywordIndex)
@@ -227,11 +228,8 @@ extension TypeDeclaration {
                 // XCTest assertions have throwing autoclosures, so can include a `try`
                 // without the test case being `throws`. If the test case method isn't `throws`
                 // but has any `try`s in the method body, we have to add `throws`.
-                if !tokens[endOfParameters ..< startOfFunctionBody].contains(.keyword("throws")),
-                   tokens[startOfFunctionBody ... endOfFunctionBody].contains(.keyword("try")),
-                   let indexBeforeStartOfFunctionBody = formatter.index(of: .nonSpaceOrComment, before: startOfFunctionBody)
-                {
-                    formatter.insert([.space(" "), .keyword("throws")], at: indexBeforeStartOfFunctionBody + 1)
+                if tokens[startOfFunctionBody ... endOfFunctionBody].contains(.keyword("try")) {
+                    formatter.addEffect("throws", to: functionDecl)
                 }
 
                 // Add the @Test macro

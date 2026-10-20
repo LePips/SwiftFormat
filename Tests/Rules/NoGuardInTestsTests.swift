@@ -182,6 +182,31 @@ final class NoGuardInTestsTests: XCTestCase {
         testFormatting(for: input, output, rule: .noGuardInTests)
     }
 
+    func testPreservesTypedThrows() {
+        let input = """
+        import Testing
+
+        @Test func something() throws(any Error) {
+            guard let value = optionalValue else { return }
+
+            print(value)
+        }
+        """
+        let output = """
+        import Testing
+
+        @Test func something() throws(any Error) {
+            let value = try #require(optionalValue)
+
+            print(value)
+        }
+        """
+        testFormatting(
+            for: input, output, rule: .noGuardInTests,
+            options: .init(swiftVersion: "6.0"), exclude: [.redundantTypedThrows]
+        )
+    }
+
     func testHandlesAsyncFunction() {
         let input = """
         import XCTest

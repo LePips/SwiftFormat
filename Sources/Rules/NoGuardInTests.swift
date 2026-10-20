@@ -294,7 +294,7 @@ public extension FormatRule {
 
             // If we added try XCTUnwrap or try #require, ensure the function has throws
             if addedTryStatement {
-                formatter.addThrowsEffect(to: functionDecl)
+                formatter.addEffect("throws", to: functionDecl)
             }
         }
     } examples: {

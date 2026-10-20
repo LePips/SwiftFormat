@@ -478,6 +478,29 @@ final class NoForceUnwrapInTestsTests: XCTestCase {
         testFormatting(for: input, output, rule: .noForceUnwrapInTests, exclude: [.hoistTry])
     }
 
+    func testPreservesTypedThrows() {
+        let input = """
+        import Testing
+
+        @Test func something() async throws(any Error) {
+            let value = await loadValue()
+            let result = value!
+        }
+        """
+        let output = """
+        import Testing
+
+        @Test func something() async throws(any Error) {
+            let value = await loadValue()
+            let result = try #require(value)
+        }
+        """
+        testFormatting(
+            for: input, output, rule: .noForceUnwrapInTests,
+            options: .init(swiftVersion: "6.0"), exclude: [.redundantTypedThrows]
+        )
+    }
+
     func testAsyncThrowingFunction() {
         let input = """
         import Testing

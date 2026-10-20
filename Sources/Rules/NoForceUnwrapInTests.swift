@@ -249,7 +249,7 @@ public extension FormatRule {
 
             // If we found any force unwraps, add a `throws` if it doesn't already exist
             if convertedAnyForceUnwrapOperators {
-                formatter.addThrowsEffect(to: functionDecl)
+                formatter.addEffect("throws", to: functionDecl)
             }
         }
     } examples: {

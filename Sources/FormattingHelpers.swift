@@ -1704,22 +1704,21 @@ extension Formatter {
         insertEffectKeyword(at: insertIndex)
     }
 
-    /// Adds `throws` effect to the given function declaration if not already present
-    func addThrowsEffect(to functionDecl: FunctionDeclaration) {
-        guard !functionDecl.effects.contains("throws") else { return }
+    /// Adds an `async` or `throws` effect if absent, preserving existing typed throws or rethrows.
+    /// Inserts `async` before throwing effects, and `throws` after `async`.
+    func addEffect(_ effect: String, to functionDecl: FunctionDeclaration) {
+        assert(effect == "async" || effect == "throws")
 
-        if let effectsRange = functionDecl.effectsRange {
-            // If async is present, insert throws after it to maintain correct order: async throws
-            if let asyncIndex = index(of: .identifier("async"), in: effectsRange.lowerBound ..< effectsRange.upperBound + 1) {
-                insert([.space(" "), .keyword("throws")], at: asyncIndex + 1)
-            } else {
-                // Otherwise add it to the end of effects
-                insert([.keyword("throws"), .space(" ")], at: effectsRange.upperBound)
-            }
-        } else {
-            // If there are no effects, add after the arguments
-            insert([.space(" "), .keyword("throws")], at: functionDecl.argumentsRange.upperBound + 1)
-        }
+        // Read the current clause so repeated additions don't use stale effect information.
+        let endOfArguments = functionDecl.argumentsRange.upperBound
+        let effects = parseFunctionDeclarationEffectsClause(at: endOfArguments)
+        guard effects?.effects.contains(where: {
+            $0.hasPrefix(effect) || (effect == "throws" && $0 == "rethrows")
+        }) != true else { return }
+
+        let insertionIndex = effect == "async" ? endOfArguments : (effects?.range.upperBound ?? endOfArguments)
+        let effectToken: Token = effect == "async" ? .identifier(effect) : .keyword(effect)
+        insert([.space(" "), effectToken], at: insertionIndex + 1)
     }
 
     /// Removes the given `throws` or `async` effect from the given function declaration if present

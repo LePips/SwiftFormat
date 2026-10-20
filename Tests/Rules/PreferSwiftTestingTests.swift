@@ -657,6 +657,70 @@ final class PreferSwiftTestingTests: XCTestCase {
         testFormatting(for: input, [output], rules: [.preferSwiftTesting, .sortImports], options: options)
     }
 
+    func testPreservesTypedThrows() {
+        let input = """
+        import XCTest
+
+        final class MyFeatureTests: XCTestCase {
+            func testMyFeatureWorks() throws(any Error) {
+                XCTAssertTrue(try feature.worksProperly)
+            }
+
+            func testMyFeatureWorksAsync() async throws(any Error) {
+                let feature = await loadFeature()
+                XCTAssertTrue(try feature.worksProperly)
+            }
+        }
+        """
+        let output = """
+        import Foundation
+        import Testing
+
+        final class MyFeatureTests {
+            @Test func myFeatureWorks() throws(any Error) {
+                #expect(try feature.worksProperly)
+            }
+
+            @Test func myFeatureWorksAsync() async throws(any Error) {
+                let feature = await loadFeature()
+                #expect(try feature.worksProperly)
+            }
+        }
+        """
+        testFormatting(
+            for: input, [output], rules: [.preferSwiftTesting, .sortImports],
+            options: .init(swiftVersion: "6.0"), exclude: [.redundantTypedThrows]
+        )
+    }
+
+    func testAddsThrowsAfterAsyncBeforeComment() {
+        let input = """
+        import XCTest
+
+        final class MyFeatureTests: XCTestCase {
+            func testMyFeatureWorks() async /* keep */ {
+                let feature = await loadFeature()
+                XCTAssertTrue(try feature.worksProperly)
+            }
+        }
+        """
+        let output = """
+        import Foundation
+        import Testing
+
+        final class MyFeatureTests {
+            @Test func myFeatureWorks() async throws /* keep */ {
+                let feature = await loadFeature()
+                #expect(try feature.worksProperly)
+            }
+        }
+        """
+        testFormatting(
+            for: input, [output], rules: [.preferSwiftTesting, .sortImports],
+            options: .init(swiftVersion: "6.0")
+        )
+    }
+
     func testPreservesAdditionalXCTestSymbols() {
         let input = """
         @testable import MyFeatureLib

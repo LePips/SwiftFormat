@@ -39,7 +39,7 @@ public extension FormatRule {
             // If we found any `!`s, add a `throws` if it doesn't already exist.
             guard foundAnyTryExclamationMarks else { return }
 
-            formatter.addThrowsEffect(to: functionDecl)
+            formatter.addEffect("throws", to: functionDecl)
         }
     } examples: {
         """

@@ -4135,4 +4135,62 @@ final class ParsingHelpersTests: XCTestCase {
         XCTAssertEqual(declarationBodyBraces("switch foo { case .bar: baaz() }"), [false])
         XCTAssertEqual(declarationBodyBraces("if foo { bar() } else { baaz() }"), [false, false])
     }
+
+    func testAddEffectsInEitherOrder() throws {
+        let input = """
+        func foo<T>(_ value: T) -> T where T: Equatable {
+            value
+        }
+        """
+        let output = """
+        func foo<T>(_ value: T) async throws -> T where T: Equatable {
+            value
+        }
+        """
+        for effects in [["async", "throws"], ["throws", "async"]] {
+            let formatter = Formatter(tokenize(input), trackChanges: true)
+            let function = try XCTUnwrap(formatter.parseFunctionDeclaration(keywordIndex: 0))
+            for effect in effects + effects {
+                formatter.addEffect(effect, to: function)
+            }
+            XCTAssertEqual(formatter.tokens.string, output)
+            XCTAssertEqual(formatter.changes.count, 2)
+        }
+    }
+
+    func testAddAsyncBeforeTypedThrowsPreservesComments() throws {
+        let input = """
+        func foo() /* before */ throws(/* error type */ Module.Failure<Bar>) /* after */ -> Int {
+            0
+        }
+        """
+        let output = """
+        func foo() async /* before */ throws(/* error type */ Module.Failure<Bar>) /* after */ -> Int {
+            0
+        }
+        """
+        let formatter = Formatter(tokenize(input))
+        let function = try XCTUnwrap(formatter.parseFunctionDeclaration(keywordIndex: 0))
+        formatter.addEffect("async", to: function)
+        formatter.addEffect("throws", to: function)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testAddingExistingEffectsDoesNotRecordChanges() throws {
+        let input = """
+        func untyped() async throws {}
+        func typed() async throws(/* error type */ MyError) {}
+        func rethrowing(_ body: () throws -> Void) async rethrows {
+            try body()
+        }
+        """
+        let formatter = Formatter(tokenize(input), trackChanges: true)
+        for declaration in formatter.parseDeclarations() {
+            let function = try XCTUnwrap(formatter.parseFunctionDeclaration(keywordIndex: declaration.keywordIndex))
+            formatter.addEffect("throws", to: function)
+            formatter.addEffect("async", to: function)
+        }
+        XCTAssertEqual(formatter.tokens.string, input)
+        XCTAssertTrue(formatter.changes.isEmpty)
+    }
 }
