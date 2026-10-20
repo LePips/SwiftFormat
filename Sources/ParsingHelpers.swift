@@ -526,6 +526,39 @@ extension Formatter {
         }) ? i : nil
     }
 
+    /// Removes an exact declaration modifier, including any arguments.
+    /// `private` and `private(set)` are distinct modifiers. Comments are preserved.
+    func removeModifier(_ modifier: String, forDeclarationAt index: Int) {
+        guard let modifierIndex = indexOfModifier(modifier, forDeclarationAt: index),
+              isModifier(at: modifierIndex)
+        else { return }
+
+        var endIndex = modifierIndex
+        if let argumentStart = self.index(of: .nonSpaceOrCommentOrLinebreak, after: modifierIndex),
+           tokens[argumentStart] == .startOfScope("("),
+           let argumentEnd = endOfScope(at: argumentStart)
+        {
+            endIndex = argumentEnd
+        }
+
+        guard !tokens[modifierIndex ... endIndex].contains(where: \.isComment),
+              let nextIndex = self.index(of: .nonSpace, after: endIndex)
+        else { return }
+
+        if tokens[nextIndex].isLinebreak {
+            if startOfLine(at: modifierIndex, excludingIndent: true) == modifierIndex {
+                // Remove the whole line if it contained only this modifier.
+                removeTokens(in: startOfLine(at: modifierIndex) ... nextIndex)
+            } else {
+                // Keep the linebreak after any preceding modifiers or comments.
+                let startIndex = token(at: modifierIndex - 1)?.isSpace == true ? modifierIndex - 1 : modifierIndex
+                removeTokens(in: startIndex ..< nextIndex)
+            }
+        } else {
+            removeTokens(in: modifierIndex ..< nextIndex)
+        }
+    }
+
     /// Returns the index of the first modifier in a list
     func startOfModifiers(at index: Int, includingAttributes: Bool) -> Int {
         var startIndex = index

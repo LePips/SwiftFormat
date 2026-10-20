@@ -191,14 +191,7 @@ extension Declaration {
     /// Removes ACL modifiers from this declaration, except for the specified exceptions.
     func removeACLModifiers(except exceptions: [String]) {
         for aclModifier in _FormatRules.aclModifiers where !exceptions.contains(aclModifier) {
-            if let modifierIndex = formatter.indexOfModifier(aclModifier, forDeclarationAt: keywordIndex) {
-                // Remove the modifier and its trailing space
-                if let nextIndex = formatter.index(of: .nonSpace, after: modifierIndex), nextIndex > modifierIndex + 1 {
-                    formatter.removeTokens(in: modifierIndex ... (modifierIndex + 1))
-                } else {
-                    formatter.removeToken(at: modifierIndex)
-                }
-            }
+            formatter.removeModifier(aclModifier, forDeclarationAt: keywordIndex)
         }
     }
 

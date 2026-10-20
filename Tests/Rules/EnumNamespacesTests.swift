@@ -71,6 +71,29 @@ final class EnumNamespacesTests: XCTestCase {
         testFormatting(for: input, output, rule: .enumNamespaces)
     }
 
+    func testRemovingFinalPreservesCommentsAndHandlesOwnLine() {
+        let input = """
+        public final/* keep */ class FirstNamespace {
+            static let value = 1
+        }
+
+        final
+        class SecondNamespace {
+            static let value = 2
+        }
+        """
+        let output = """
+        public /* keep */ enum FirstNamespace {
+            static let value = 1
+        }
+
+        enum SecondNamespace {
+            static let value = 2
+        }
+        """
+        testFormatting(for: input, output, rule: .enumNamespaces)
+    }
+
     func testEnumNamespacesNestedTypes() {
         let input = """
         enum Namespace {}

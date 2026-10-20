@@ -395,6 +395,40 @@ final class TestSuiteAccessControlTests: XCTestCase {
         testFormatting(for: input, output, rule: .testSuiteAccessControl, exclude: [.unusedArguments, .validateTestCases])
     }
 
+    func testRemovingPrivatePreservesCommentsAndHandlesOwnLine() {
+        let input = """
+        import Testing
+
+        private
+        struct MyFeatureTests {
+            @Test private/* keep */ func featureWorks() {
+                #expect(true)
+            }
+
+            @Test
+            private
+            func anotherFeature() {
+                #expect(true)
+            }
+        }
+        """
+        let output = """
+        import Testing
+
+        struct MyFeatureTests {
+            @Test /* keep */ func featureWorks() {
+                #expect(true)
+            }
+
+            @Test
+            func anotherFeature() {
+                #expect(true)
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .testSuiteAccessControl)
+    }
+
     func testSwiftTestingPrivateTestFunctionsAreMadeInternal() {
         let input = """
         import Testing

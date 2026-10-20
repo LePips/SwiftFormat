@@ -49,11 +49,7 @@ public extension FormatRule {
 
             formatter.replaceToken(at: i, with: .keyword("enum"))
 
-            if let finalIndex = formatter.indexOfModifier("final", forDeclarationAt: i),
-               let nextIndex = formatter.index(of: .nonSpace, after: finalIndex)
-            {
-                formatter.removeTokens(in: finalIndex ..< nextIndex)
-            }
+            formatter.removeModifier("final", forDeclarationAt: i)
         }
     } examples: {
         """

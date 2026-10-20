@@ -116,6 +116,50 @@ final class PreferSwiftTestingTests: XCTestCase {
         testFormatting(for: input, [output], rules: [.preferSwiftTesting, .sortImports, .isEmpty], options: options)
     }
 
+    func testRemovingOverridePreservesAdjacentComments() {
+        let input = """
+        import XCTest
+
+        final class MyFeatureTests: XCTestCase {
+            override/* keep setup */ func setUp() {
+                prepare()
+            }
+
+            override// keep cleanup
+            func tearDown() {
+                cleanup()
+            }
+
+            func testFeatureWorks() {
+                XCTAssertTrue(feature.worksProperly)
+            }
+        }
+        """
+        let output = """
+        import Foundation
+        import Testing
+
+        final class MyFeatureTests {
+            /* keep setup */ init() {
+                prepare()
+            }
+
+            // keep cleanup
+            deinit {
+                cleanup()
+            }
+
+            @Test func featureWorks() {
+                #expect(feature.worksProperly)
+            }
+        }
+        """
+        testFormatting(
+            for: input, [output], rules: [.preferSwiftTesting, .sortImports],
+            options: .init(swiftVersion: "6.0"), exclude: [.docComments]
+        )
+    }
+
     func testConvertsSimpleXCTestHelpers() {
         let input = """
         import XCTest

@@ -26,15 +26,8 @@ public extension FormatRule {
                 guard !typeDeclaration.body.containsMutableStoredInstanceVar else { return }
                 guard !typeDeclaration.body.containsDeinitializer else { return }
                 guard typeDeclaration.conformances.isEmpty else { return }
-                var keywordIndex = typeDeclaration.keywordIndex
-
-                if let finalIndex = formatter.indexOfModifier("final", forDeclarationAt: keywordIndex),
-                   let nextIndex = formatter.index(of: .nonSpace, after: finalIndex)
-                {
-                    formatter.removeTokens(in: finalIndex ..< nextIndex)
-                    keywordIndex = typeDeclaration.keywordIndex
-                }
-                formatter.replaceToken(at: keywordIndex, with: .keyword("struct"))
+                formatter.removeModifier("final", forDeclarationAt: typeDeclaration.keywordIndex)
+                formatter.replaceToken(at: typeDeclaration.keywordIndex, with: .keyword("struct"))
 
             case "enum":
                 guard !typeDeclaration.body.containsEnumCaseDeclaration else { return }

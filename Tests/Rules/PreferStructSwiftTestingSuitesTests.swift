@@ -33,6 +33,33 @@ final class PreferStructSwiftTestingSuitesTests: XCTestCase {
         )
     }
 
+    func testConvertsSuiteWithFinalOnOwnLine() {
+        let input = """
+        import Testing
+
+        final
+        class MyFeatureTests {
+            private let value = 1
+
+            @Test func featureWorks() {
+                #expect(value == 1)
+            }
+        }
+        """
+        let output = """
+        import Testing
+
+        struct MyFeatureTests {
+            private let value = 1
+
+            @Test func featureWorks() {
+                #expect(value == 1)
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .preferStructSwiftTestingSuites)
+    }
+
     func testConvertsClassSuiteWithImmutableStoredPropertyToStruct() {
         let input = """
         import Testing

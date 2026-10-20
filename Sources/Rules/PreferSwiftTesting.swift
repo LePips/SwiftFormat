@@ -551,9 +551,7 @@ extension Formatter {
         }
 
         // Remove the `override` modifier
-        if let overrideModifier = indexOfModifier("override", forDeclarationAt: keywordIndex) {
-            removeTokens(in: overrideModifier ... overrideModifier + 1)
-        }
+        removeModifier("override", forDeclarationAt: keywordIndex)
     }
 }
 

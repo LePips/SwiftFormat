@@ -4135,4 +4135,97 @@ final class ParsingHelpersTests: XCTestCase {
         XCTAssertEqual(declarationBodyBraces("switch foo { case .bar: baaz() }"), [false])
         XCTAssertEqual(declarationBodyBraces("if foo { bar() } else { baaz() }"), [false, false])
     }
+
+    func testRemoveModifierPreservesAdjacentComments() throws {
+        let input = """
+        public/* before */ final/* after */ class Foo {}
+        """
+        let output = """
+        public/* before */ /* after */ class Foo {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let keywordIndex = try XCTUnwrap(formatter.index(of: .keyword("class"), after: -1))
+        formatter.removeModifier("final", forDeclarationAt: keywordIndex)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveModifierOnOwnLinePreservesIndentation() {
+        let input = """
+        struct Outer {
+            public
+            final
+            class Inner {}
+        }
+        """
+        let output = """
+        struct Outer {
+            public
+            class Inner {}
+        }
+        """
+        let formatter = Formatter(tokenize(input))
+        formatter.forEach(.keyword("class")) { index, _ in
+            formatter.removeModifier("final", forDeclarationAt: index)
+        }
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveModifierPreservesLinebreakAfterOtherModifiers() throws {
+        let input = """
+        public final
+        class Foo {}
+        """
+        let output = """
+        public
+        class Foo {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let keywordIndex = try XCTUnwrap(formatter.index(of: .keyword("class"), after: -1))
+        formatter.removeModifier("final", forDeclarationAt: keywordIndex)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveModifierDistinguishesSetterAccess() {
+        let input = """
+        private var first = 0
+        private(set) var second = 0
+        """
+        let output = """
+        var first = 0
+        private(set) var second = 0
+        """
+        let formatter = Formatter(tokenize(input), trackChanges: true)
+        for declaration in formatter.parseDeclarations() {
+            formatter.removeModifier("private", forDeclarationAt: declaration.keywordIndex)
+            let changes = formatter.changes
+            formatter.removeModifier("private", forDeclarationAt: declaration.keywordIndex)
+            XCTAssertEqual(formatter.changes, changes)
+        }
+        XCTAssertEqual(formatter.tokens.string, output)
+        XCTAssertFalse(formatter.changes.isEmpty)
+    }
+
+    func testRemoveSetterAccessModifier() throws {
+        let input = """
+        public private(set) var value = 0
+        """
+        let output = """
+        public var value = 0
+        """
+        let formatter = Formatter(tokenize(input))
+        let keywordIndex = try XCTUnwrap(formatter.index(of: .keyword("var"), after: -1))
+        formatter.removeModifier("private(set)", forDeclarationAt: keywordIndex)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveModifierPreservesCommentsInArguments() throws {
+        let input = """
+        private(/* keep */ set) var value = 0
+        """
+        let formatter = Formatter(tokenize(input), trackChanges: true)
+        let keywordIndex = try XCTUnwrap(formatter.index(of: .keyword("var"), after: -1))
+        formatter.removeModifier("private(/* keep */ set)", forDeclarationAt: keywordIndex)
+        XCTAssertEqual(formatter.tokens.string, input)
+        XCTAssertTrue(formatter.changes.isEmpty)
+    }
 }
