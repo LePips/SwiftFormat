@@ -168,6 +168,33 @@ final class ValidateTestCasesTests: XCTestCase {
         testFormatting(for: input, output, rule: .validateTestCases, exclude: [.unusedArguments, .testSuiteAccessControl])
     }
 
+    func testSwiftTestingAddsTestAttributeAfterCommentsAndBeforeExistingAttributes() {
+        let input = """
+        import Testing
+
+        struct MyFeatureTests {
+            /// Checks the feature.
+            @MainActor /* keep */ func featureWorks() {
+                #expect(true)
+            }
+        }
+        """
+        let output = """
+        import Testing
+
+        struct MyFeatureTests {
+            /// Checks the feature.
+            @Test @MainActor /* keep */ func featureWorks() {
+                #expect(true)
+            }
+        }
+        """
+        testFormatting(
+            for: input, [output], rules: [.validateTestCases, .organizeDeclarations],
+            exclude: [.testSuiteAccessControl]
+        )
+    }
+
     func testSwiftTestingPreservesOpenTestClass() {
         let input = """
         import Testing

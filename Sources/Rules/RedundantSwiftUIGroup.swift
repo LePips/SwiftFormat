@@ -78,7 +78,7 @@ public extension FormatRule {
                 // @ContentBuilder requires the Swift 6.4 SDK (Xcode 27)
                 let preferContentBuilder = formatter.options.preferContentBuilder && formatter.options.swiftVersion >= "6.4"
                 let attribute = preferContentBuilder ? "@ContentBuilder" : "@ViewBuilder"
-                formatter.insertResultBuilderAttribute(attribute, at: addViewBuilderAt)
+                formatter.insertAttribute(attribute, at: addViewBuilderAt, onOwnLine: true)
             }
         }
     } examples: {

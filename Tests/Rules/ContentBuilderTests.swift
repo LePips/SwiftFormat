@@ -879,6 +879,28 @@ final class ContentBuilderTests: XCTestCase {
         testFormatting(for: input, output, rule: .contentBuilder, options: options)
     }
 
+    func testAddsContentBuilderAfterCommentsWithOrganizeDeclarations() {
+        let input = """
+        struct Example {
+            /// The content to display.
+            @MainActor private /* keep */ var content: some View {
+                Text("Example")
+            }
+        }
+        """
+        let output = """
+        struct Example {
+            /// The content to display.
+            @ContentBuilder
+            @MainActor private /* keep */ var content: some View {
+                Text("Example")
+            }
+        }
+        """
+        let options = FormatOptions(contentBuilder: .explicit, preferContentBuilder: true, swiftVersion: "6.4")
+        testFormatting(for: input, [output], rules: [.contentBuilder, .organizeDeclarations], options: options)
+    }
+
     func testAddsContentBuilderToExplicitGetter() {
         let input = """
         var content: some View {

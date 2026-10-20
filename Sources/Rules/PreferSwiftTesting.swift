@@ -235,7 +235,11 @@ extension TypeDeclaration {
                 }
 
                 // Add the @Test macro
-                formatter.insert(tokenize("@Test "), at: formatter.startOfModifiers(at: instanceMethod.keywordIndex, includingAttributes: true))
+                formatter.insertAttribute(
+                    "@Test",
+                    at: formatter.startOfModifiers(at: instanceMethod.keywordIndex, includingAttributes: true),
+                    onOwnLine: false
+                )
             }
         }
     }

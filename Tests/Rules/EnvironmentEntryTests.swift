@@ -252,6 +252,30 @@ final class EnvironmentEntryTests: XCTestCase {
         )
     }
 
+    func testEntryAttributePreservesCommentsWithOrganizeDeclarations() {
+        let input = """
+        struct ScreenNameEnvironmentKey: EnvironmentKey {
+            static let defaultValue = "Untitled"
+        }
+
+        extension EnvironmentValues {
+            /// The screen name.
+            public /* keep */ var screenName: String {
+                get { self[ScreenNameEnvironmentKey.self] }
+                set { self[ScreenNameEnvironmentKey.self] = newValue }
+            }
+        }
+        """
+        let output = """
+        extension EnvironmentValues {
+            /// The screen name.
+            @Entry public /* keep */ var screenName: String = "Untitled"
+        }
+        """
+        let options = FormatOptions(organizeTypes: ["extension"], swiftVersion: "6.0")
+        testFormatting(for: input, [output], rules: [.environmentEntry, .organizeDeclarations], options: options)
+    }
+
     func testEnvironmentKeyWithMultipleDefinitionsIsNotRemoved() {
         let input = """
         extension EnvironmentValues {

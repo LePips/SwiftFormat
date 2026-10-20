@@ -267,9 +267,14 @@ final class MetadataTests: XCTestCase {
                         referencedOptions.append(Descriptors.indent)
                     case .identifier("isInStringLiteralWithWrappingDisabled"):
                         referencedOptions.append(Descriptors.wrapStringInterpolation)
-                    case .identifier("insertLinebreak"), .identifier("linebreakToken"),
-                         .identifier("insertResultBuilderAttribute"):
+                    case .identifier("insertLinebreak"), .identifier("linebreakToken"):
                         referencedOptions.append(Descriptors.linebreak)
+                    case .identifier("insertAttribute"):
+                        if let arguments = formatter.parseFunctionCallArguments(after: index),
+                           arguments.contains(where: { $0.label == "onOwnLine" && $0.value != "false" })
+                        {
+                            referencedOptions.append(Descriptors.linebreak)
+                        }
                     case .identifier("wrapCollectionsAndArguments"):
                         referencedOptions += [
                             Descriptors.wrapArguments, Descriptors.wrapParameters, Descriptors.wrapCollections,

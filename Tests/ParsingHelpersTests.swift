@@ -1020,6 +1020,79 @@ final class ParsingHelpersTests: XCTestCase {
         XCTAssertEqual(formatter.endOfAttribute(at: 0), 7)
     }
 
+    func testInsertAttributeInlinePreservesCommentsAndModifiers() {
+        let input = """
+        struct Example {
+            /// Runs the example.
+            @MainActor /* keep */ func example() {}
+        }
+        """
+        let output = """
+        struct Example {
+            /// Runs the example.
+            @Test("Example", .disabled()) @MainActor /* keep */ func example() {}
+        }
+        """
+        let formatter = Formatter(tokenize(input))
+        formatter.forEach(.keyword("func")) { index, _ in
+            formatter.insertAttribute(
+                "@Test(\"Example\", .disabled())",
+                at: formatter.startOfModifiers(at: index, includingAttributes: true),
+                onOwnLine: false
+            )
+        }
+        XCTAssertEqual(formatter.tokens.string, output)
+        XCTAssertTrue(formatter.tokens.contains(.keyword("@Test")))
+        XCTAssertEqual(
+            formatter.parseDeclarations().first?.body?.first?.attributes,
+            ["@MainActor", "@Test(\"Example\", .disabled())"]
+        )
+    }
+
+    func testInsertAttributeOnOwnLinePreservesCommentsIndentationAndLinebreaks() {
+        let input = """
+        struct Example {
+          /// Runs the example.
+          @MainActor /* keep */ func example() {}
+        }
+        """.replacingOccurrences(of: "\n", with: "\r\n")
+        let output = """
+        struct Example {
+          /// Runs the example.
+          @Custom.Builder
+          @MainActor /* keep */ func example() {}
+        }
+        """.replacingOccurrences(of: "\n", with: "\r\n")
+        let formatter = Formatter(tokenize(input), options: .init(indent: "  ", linebreak: "\r\n"))
+        formatter.forEach(.keyword("func")) { index, _ in
+            formatter.insertAttribute(
+                "@Custom.Builder",
+                at: formatter.startOfModifiers(at: index, includingAttributes: true),
+                onOwnLine: true
+            )
+        }
+        XCTAssertEqual(formatter.tokens.string, output)
+        XCTAssertTrue(formatter.tokens.contains(.keyword("@Custom")))
+        XCTAssertEqual(
+            formatter.parseDeclarations().first?.body?.first?.attributes,
+            ["@MainActor", "@Custom.Builder"]
+        )
+    }
+
+    func testInsertAttributeOnOwnLineAtStartOfFile() {
+        let input = """
+        func example() {}
+        """
+        let output = """
+        @MainActor
+        func example() {}
+        """
+        let formatter = Formatter(tokenize(input))
+        formatter.insertAttribute("@MainActor", at: 0, onOwnLine: true)
+        XCTAssertEqual(formatter.tokens.string, output)
+        XCTAssertEqual(formatter.parseDeclarations().first?.attributes, ["@MainActor"])
+    }
+
     // MARK: processDeclaredVariables
 
     func testProcessCommaDelimitedDeclaredVariables() {

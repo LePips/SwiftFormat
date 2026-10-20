@@ -60,6 +60,34 @@ final class PreferSwiftTestingTests: XCTestCase {
         testFormatting(for: input, [output], rules: [.preferSwiftTesting, .sortImports, .isEmpty, .swiftTestingTestCaseNames], options: options)
     }
 
+    func testAddsTestAttributeAfterCommentsAndBeforeExistingAttributes() {
+        let input = """
+        import XCTest
+
+        final class MyFeatureTests: XCTestCase {
+            /// Checks the feature.
+            @MainActor /* keep */ func testFeatureWorks() {
+                XCTAssertTrue(feature.worksProperly)
+            }
+        }
+        """
+        let output = """
+        import Foundation
+        import Testing
+
+        final class MyFeatureTests {
+            /// Checks the feature.
+            @Test @MainActor /* keep */ func featureWorks() {
+                #expect(feature.worksProperly)
+            }
+        }
+        """
+        testFormatting(
+            for: input, [output], rules: [.preferSwiftTesting, .sortImports, .organizeDeclarations],
+            options: .init(swiftVersion: "6.0")
+        )
+    }
+
     func testConvertsTestSuiteWithSetUpTearDown() {
         let input = """
         @testable import MyFeatureLib

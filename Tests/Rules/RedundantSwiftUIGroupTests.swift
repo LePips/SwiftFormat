@@ -422,6 +422,7 @@ final class RedundantSwiftUIGroupTests: XCTestCase {
           @FocusState private var streetFieldFocused: Bool
           @AccessibilityFocusState private var isExpandedContentFocused: Bool
 
+          /// The form content.
           private var formGroup: some View {
             Group {
               Text("foo")
@@ -435,6 +436,7 @@ final class RedundantSwiftUIGroupTests: XCTestCase {
           @FocusState private var streetFieldFocused: Bool
           @AccessibilityFocusState private var isExpandedContentFocused: Bool
 
+          /// The form content.
           @ViewBuilder
           private var formGroup: some View {
             Text("foo")

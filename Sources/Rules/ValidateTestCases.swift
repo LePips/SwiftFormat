@@ -163,6 +163,6 @@ extension Formatter {
 
         // Add @Test attribute before the function
         let insertIndex = startOfModifiers(at: function.keywordIndex, includingAttributes: true)
-        insert(tokenize("@Test "), at: insertIndex)
+        insertAttribute("@Test", at: insertIndex, onOwnLine: false)
     }
 }

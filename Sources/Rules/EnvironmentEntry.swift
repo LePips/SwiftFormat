@@ -190,7 +190,7 @@ extension Formatter {
                 insert(defaultValueTokens, at: endOfLine(at: propertyDeclaration.range.lowerBound))
             }
             // Add @Entry Macro
-            insert([.identifier("@Entry"), .space(" ")], at: propertyDeclaration.range.lowerBound)
+            insertAttribute("@Entry", at: propertyDeclaration.startOfModifiersIndex, onOwnLine: false)
         }
     }
 }

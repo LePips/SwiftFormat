@@ -156,9 +156,10 @@ extension Formatter {
                   scopeBodySupportsResultBuilder(at: target.scopeRange.lowerBound)
             else { return }
 
-            insertResultBuilderAttribute(
+            insertAttribute(
                 attribute,
-                at: declaration.startOfModifiersIndex(includingAttributes: true)
+                at: declaration.startOfModifiersIndex(includingAttributes: true),
+                onOwnLine: true
             )
         }
     }

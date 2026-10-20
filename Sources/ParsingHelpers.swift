@@ -1278,6 +1278,22 @@ extension Formatter {
         }
     }
 
+    /// Inserts an attribute, including any qualification or arguments, inline or on its own line.
+    /// The index must be the start of the declaration's modifiers.
+    func insertAttribute(_ attribute: String, at index: Int, onOwnLine: Bool) {
+        if onOwnLine {
+            // Existing indentation now indents the attribute, so copy it for the declaration.
+            let indent = currentIndentForLine(at: index)
+            if !indent.isEmpty {
+                insert(.space(indent), at: index)
+            }
+            insertLinebreak(at: index)
+        } else {
+            insert(.space(" "), at: index)
+        }
+        insert(tokenize(attribute), at: index)
+    }
+
     /// Whether or not this property at the given introducer index (either `var` or `let`)
     /// is a stored property or a computed property.
     func isStoredProperty(atIntroducerIndex introducerIndex: Int) -> Bool {
@@ -2720,23 +2736,6 @@ extension Formatter {
         return (startOfModifiers ..< declaration.keywordIndex).contains(where: {
             tokens[$0].string.hasSuffix("Builder")
         })
-    }
-
-    /// Inserts a result builder attribute like `@ViewBuilder` on its own line at the given index,
-    /// which must be the start of the declaration's modifiers.
-    func insertResultBuilderAttribute(_ attribute: String, at index: Int) {
-        // Any existing indentation before the insertion point now indents the attribute,
-        // so the declaration that follows needs its own copy of the indentation.
-        let currentIndent = currentIndentForLine(at: index)
-
-        // Attributes are represented as `.keyword` tokens (e.g. `@objc`, `@main`). Inserting an
-        // `.identifier` instead causes other rules like `organizeDeclarations` to misparse the
-        // declaration and insert a spurious blank line after the attribute.
-        var tokensToInsert: [Token] = [.keyword(attribute), linebreakToken(for: index)]
-        if !currentIndent.isEmpty {
-            tokensToInsert.append(.space(currentIndent))
-        }
-        insert(tokensToInsert, at: index)
     }
 
     // MARK: -
