@@ -4135,4 +4135,96 @@ final class ParsingHelpersTests: XCTestCase {
         XCTAssertEqual(declarationBodyBraces("switch foo { case .bar: baaz() }"), [false])
         XCTAssertEqual(declarationBodyBraces("if foo { bar() } else { baaz() }"), [false, false])
     }
+
+    func testRemoveQualifiedConformance() {
+        let input = """
+        struct Only : Module.Foo {}
+        struct First: Module.Foo, Bar {}
+        struct Middle: Bar, Module.Foo, Baaz {}
+        struct Last: Bar, Module.Foo {}
+        """
+        let output = """
+        struct Only {}
+        struct First: Bar {}
+        struct Middle: Bar, Baaz {}
+        struct Last: Bar {}
+        """
+        let formatter = Formatter(tokenize(input))
+        formatter.forEach(.identifier("Module")) { index, _ in
+            formatter.removeConformance(at: index)
+        }
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveAttributedConformance() throws {
+        let input = """
+        class Foo: Bar, @unchecked Swift.Sendable {}
+        """
+        let output = """
+        class Foo: Bar {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let index = try XCTUnwrap(formatter.index(of: .keyword("@unchecked"), after: -1))
+        formatter.removeConformance(at: index)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveGenericConformanceBeforeWhereClause() throws {
+        let input = """
+        class Foo<T>: Module.Bar<T> where T: Equatable {}
+        """
+        let output = """
+        class Foo<T> where T: Equatable {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let index = try XCTUnwrap(formatter.index(of: .identifier("Module"), after: -1))
+        formatter.removeConformance(at: index)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveConformancePreservesFollowingTokenWithoutSpace() throws {
+        let input = """
+        struct Foo: Bar,Baaz {}
+        """
+        let output = """
+        struct Foo: Baaz {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let index = try XCTUnwrap(formatter.index(of: .identifier("Bar"), after: -1))
+        formatter.removeConformance(at: index)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveConformancePreservesFollowingLinebreak() throws {
+        let input = """
+        struct Foo: Bar,
+            Baaz {}
+        """
+        let output = """
+        struct Foo:\u{20}
+            Baaz {}
+        """
+        let formatter = Formatter(tokenize(input))
+        let index = try XCTUnwrap(formatter.index(of: .identifier("Bar"), after: -1))
+        formatter.removeConformance(at: index)
+        XCTAssertEqual(formatter.tokens.string, output)
+    }
+
+    func testRemoveConformancePreservesComments() {
+        let input = """
+        struct Before: /* keep */ Bar {}
+        struct Within: Module./* keep */Bar {}
+        struct After: Bar /* keep */, Baaz {}
+        struct LineComment: Bar // keep
+            , Baaz {}
+        """
+        let formatter = Formatter(tokenize(input))
+        for declaration in formatter.parseDeclarations() {
+            guard let conformance = declaration.asTypeDeclaration?.conformances.first else {
+                return XCTFail("Expected a conformance")
+            }
+            formatter.removeConformance(at: conformance.index)
+        }
+        XCTAssertEqual(formatter.tokens.string, input)
+    }
 }

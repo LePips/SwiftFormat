@@ -4410,30 +4410,35 @@ extension Formatter {
         return conformances
     }
 
-    /// Removes the protocol conformance at the given index.
+    /// Removes the complete protocol conformance at the given index, including
+    /// attributes, module qualification, and the adjacent comma or colon.
+    /// Leaves the conformance unchanged if removal would discard comments.
     /// e.g. can remove `Foo` from `Type: Foo, Bar {` (becomes `Type: Bar {`).
     func removeConformance(at conformanceIndex: Int) {
-        guard let previousToken = index(of: .nonSpaceOrCommentOrLinebreak, before: conformanceIndex),
-              let nextToken = index(of: .nonSpaceOrCommentOrLinebreak, after: conformanceIndex)
+        guard let conformance = parseType(at: conformanceIndex),
+              let previousTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, before: conformanceIndex),
+              [.delimiter(":"), .delimiter(",")].contains(tokens[previousTokenIndex]),
+              let nextTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: conformance.range.upperBound)
         else { return }
 
-        // The first conformance will be preceded by a colon.
-        // Every conformance but the last one will be followed by a comma.
-        //  - for example: `Type: Foo, Bar, Baaz {`
-        let isFirstConformance = tokens[previousToken] == .delimiter(":")
-        let isLastConformance = tokens[nextToken] != .delimiter(",")
-        let isOnlyConformance = isFirstConformance && isLastConformance
-
-        if isLastConformance || isOnlyConformance {
-            removeTokens(in: previousToken ... conformanceIndex)
+        let removalRange: ClosedRange<Int>
+        if tokens[nextTokenIndex] == .delimiter(",") {
+            let upperBound = token(at: nextTokenIndex + 1)?.isSpace == true
+                ? nextTokenIndex + 1 : nextTokenIndex
+            removalRange = conformanceIndex ... upperBound
         } else {
-            // When changing `Foo, Bar` to just `Bar`, also remove the space between them
-            if token(at: nextToken + 1)?.isSpace == true {
-                removeTokens(in: conformanceIndex ... (nextToken + 1))
-            } else {
-                removeTokens(in: conformanceIndex ... (nextToken + 1))
+            // Also remove any space before a colon when removing the only conformance.
+            var lowerBound = previousTokenIndex
+            if tokens[previousTokenIndex] == .delimiter(":"),
+               let previousNonSpace = index(of: .nonSpace, before: previousTokenIndex)
+            {
+                lowerBound = previousNonSpace + 1
             }
+            removalRange = lowerBound ... conformance.range.upperBound
         }
+
+        guard !tokens[removalRange].contains(where: \.isComment) else { return }
+        removeTokens(in: removalRange)
     }
 
     /// The explicit `Visibility` of the `Declaration` with its keyword at the given index

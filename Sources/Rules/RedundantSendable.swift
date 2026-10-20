@@ -49,10 +49,7 @@ public extension FormatRule {
                 formatter.isRedundantSendableConformance($0.conformance)
             }) else { return }
 
-            formatter.removeConformance(
-                at: sendableConformance.index,
-                range: sendableConformance.conformance.range
-            )
+            formatter.removeConformance(at: sendableConformance.index)
         }
     } examples: {
         """
@@ -87,40 +84,5 @@ extension Formatter {
 
         let dotToken = significantTokens[1]
         return dotToken.isOperator(".") || dotToken == .delimiter(".")
-    }
-
-    func removeConformance(at conformanceIndex: Int, range conformanceRange: ClosedRange<Int>) {
-        guard let previousTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, before: conformanceIndex),
-              let nextTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: conformanceRange.upperBound)
-        else { return }
-
-        let removalRange: ClosedRange<Int>
-        if tokens[nextTokenIndex] == .delimiter(",") {
-            let upperBound: Int
-            if token(at: nextTokenIndex + 1)?.isSpace == true {
-                upperBound = nextTokenIndex + 1
-            } else {
-                upperBound = nextTokenIndex
-            }
-            removalRange = conformanceIndex ... upperBound
-        } else {
-            // When removing all conformances, also strip any space tokens immediately
-            // before the colon to avoid leaving a trailing double space
-            // (e.g. `enum Bar : Sendable {` → `enum Bar {`, not `enum Bar  {`).
-            var lower = previousTokenIndex
-            if tokens[lower] == .delimiter(":") {
-                while lower > 0, token(at: lower - 1)?.isSpace == true {
-                    lower -= 1
-                }
-            }
-            removalRange = lower ... conformanceRange.upperBound
-        }
-
-        // Avoid removing inline comments attached to the conformance list.
-        guard !tokens[removalRange].contains(where: \.isComment) else {
-            return
-        }
-
-        removeTokens(in: removalRange)
     }
 }
