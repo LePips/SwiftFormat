@@ -214,7 +214,7 @@ func printHelp(as type: CLI.OutputType) {
     --stdin-path       Path to stdin source file (used for generating header)
     --script-input     Read Xcode SCRIPT_INPUT_FILE* environment variables as files
     --config           Path(s) to configuration file(s) containing rules and options
-    --base-config      Like --config, but local .swiftformat files aren't ignored
+    --base-config      Like --config, but local config files aren't ignored
     --infer-options    Instead of formatting input, use it to infer format options
     --output           Output path for formatted file(s) (defaults to input path)
     --exclude          Comma-delimited list of ignored paths (supports glob syntax)
@@ -279,7 +279,7 @@ private func formatTime(_ time: TimeInterval) -> String {
 
 private func serializeOptions(_ options: Options, to outputURL: URL?) throws {
     if let outputURL {
-        let file = serialize(options: options) + "\n"
+        let file = serialize(options: options, format: configFormat(for: outputURL)) + "\n"
         do {
             try file.write(to: outputURL, atomically: true, encoding: .utf8)
         } catch {
@@ -344,7 +344,7 @@ private func processConfigFile(at path: String, for argumentName: String, in dir
         throw FormatError.reading("Failed to read config file at \(url.path), \(error)")
     }
 
-    var configs = try parseConfigFile(data, logger: logger)
+    var configs = try parseConfigFile(data, format: configFormat(for: url), logger: logger)
 
     // Ensure exclude paths in config file are treated as relative to the file itself
     let configDirectory = url.deletingLastPathComponent().path

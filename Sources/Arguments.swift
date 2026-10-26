@@ -337,7 +337,7 @@ extension String {
 
 /// Extract content from a string, stopping at unquoted comment markers
 /// Handles quoted strings and escaped characters properly
-private func contentBeforeUnquotedComment(in string: String) -> String {
+func contentBeforeUnquotedComment(in string: String) -> String {
     var result = ""
     var inQuotes = false
     var escaped = false
@@ -502,7 +502,7 @@ func preprocessArguments(
         }
         if let existing = namedArgs[name], !existing.isEmpty,
            // TODO: find a more general way to represent merge-able options
-           ["exclude", "unexclude", "disable", "enable", "lint-only", "rules", "config"].contains(name) ||
+           listArguments.contains(name) ||
            Descriptors.all.contains(where: {
                $0.argumentName == name && $0.isSetType
            })
@@ -518,7 +518,7 @@ func preprocessArguments(
     return namedArgs
 }
 
-private func unknownOptionsMode(in args: [String]) -> UnknownOptionsMode? {
+func unknownOptionsMode(in args: [String]) -> UnknownOptionsMode? {
     var result: UnknownOptionsMode?
     for index in args.indices.dropLast() {
         let argument = args[index].lowercased()
@@ -694,135 +694,6 @@ func mergeArguments(_ args: [String: String], into config: [String: String],
         output[key] = inValue
     }
     return output
-}
-
-/// Parse a configuration file into a list of argument dictionaries.
-///
-/// Config files can have headers that separate them into separate sections.
-/// Each section is treated as if it were its own file. For example:
-/// ```
-/// --indent 4
-///
-/// [Tests]
-/// --filter **/Tests/**
-/// --indent 2
-/// ```
-public func parseConfigFile(_ data: Data, logger: Logger? = nil) throws -> [[String: String]] {
-    guard let input = String(data: data, encoding: .utf8) else {
-        throw FormatError.reading("Unable to read data for configuration file")
-    }
-    let lines = try cumulate(successiveLines: input.components(separatedBy: .newlines))
-
-    let configSegments = lines.split(whereSeparator: { line in
-        line.starts(with: "[") && line.contains("]")
-    })
-
-    guard !configSegments.isEmpty else {
-        return []
-    }
-
-    var configOptions = [[String: String]]()
-    var unknownOptions = UnknownOptionsMode.error
-
-    for configSegmentLines in configSegments {
-        let arguments = try configSegmentLines.flatMap { line -> [String] in
-            // TODO: parseArguments isn't a perfect fit here - should we use a different approach?
-            let line = line.replacingOccurrences(of: "\\n", with: "\n")
-            let parts = parseArguments(line, ignoreComments: false).dropFirst().map {
-                $0.replacingOccurrences(of: "\n", with: "\\n")
-            }
-            guard let key = parts.first else {
-                return []
-            }
-            if !key.hasPrefix("-") {
-                throw FormatError.options("Unknown option '\(key)' in configuration file")
-            }
-            return [key, parts.dropFirst().joined(separator: " ")]
-        }
-        do {
-            try configOptions.append(preprocessArguments(
-                arguments,
-                optionsArguments,
-                unknownOptions: unknownOptions,
-                logger: logger.map { logger in
-                    Logger { message, type in
-                        logger.print(type == .warning ? "\(message) in configuration file" : message, type)
-                    }
-                }
-            ))
-            unknownOptions = unknownOptionsMode(in: arguments) ?? unknownOptions
-        } catch let FormatError.options(message) {
-            throw FormatError.options("\(message) in configuration file")
-        }
-    }
-
-    return configOptions
-}
-
-private func cumulate(successiveLines: [String]) throws -> [String] {
-    var cumulatedLines = [String]()
-    var iterator = successiveLines.makeIterator()
-    while let currentLine = iterator.next() {
-        var cumulatedLine = contentBeforeUnquotedComment(in: currentLine).trimmingCharacters(in: .whitespaces)
-        while cumulatedLine.hasSuffix("\\") {
-            guard let nextLine = iterator.next() else {
-                throw FormatError.reading("Configuration file ends with an illegal line continuation character '\'")
-            }
-            if !nextLine.trimmingCharacters(in: .whitespaces).starts(with: "#") {
-                cumulatedLine = cumulatedLine.dropLast() + contentBeforeUnquotedComment(in: nextLine).trimmingCharacters(in: .whitespaces)
-            }
-        }
-        cumulatedLines.append(String(cumulatedLine))
-    }
-    return cumulatedLines
-}
-
-/// Serialize a set of options into either an arguments string or a file
-public func serialize(options: Options,
-                      swiftVersion: Version = .undefined,
-                      excludingDefaults: Bool = false,
-                      separator: String = "\n") -> String
-{
-    var arguments = [[String: String]]()
-    if let fileOptions = options.fileOptions {
-        arguments.append(argumentsFor(
-            Options(fileOptions: fileOptions),
-            excludingDefaults: excludingDefaults
-        ))
-    }
-    if let formatOptions = options.formatOptions {
-        arguments.append(argumentsFor(
-            Options(formatOptions: formatOptions),
-            excludingDefaults: excludingDefaults
-        ))
-    } else if swiftVersion != .undefined {
-        let descriptor = Descriptors.swiftVersion
-        arguments.append([descriptor.argumentName: swiftVersion.rawValue])
-    }
-    if let rules = options.rules {
-        arguments.append(argumentsFor(
-            Options(rules: rules),
-            excludingDefaults: excludingDefaults
-        ))
-    }
-    return arguments
-        .map { serialize(arguments: $0, separator: separator) }
-        .filter { !$0.isEmpty }
-        .joined(separator: separator)
-}
-
-/// Serialize arguments
-func serialize(arguments: [String: String], separator: String = "\n") -> String {
-    arguments.map {
-        var value = $1
-        if value.contains(" ") {
-            value = "\"\(value.replacingOccurrences(of: "\"", with: "\\\""))\""
-        }
-        if value.contains("#") {
-            value = "\"\(value)\""
-        }
-        return "--\($0) \(value)"
-    }.sorted().joined(separator: separator)
 }
 
 /// Get command line arguments from options
@@ -1159,6 +1030,9 @@ let rulesArguments = [
     "lint-only",
     "rules",
 ]
+
+/// Non-formatting arguments that take a comma-delimited list of values
+let listArguments = ["exclude", "unexclude", "config"] + rulesArguments
 
 let formattingArguments = Descriptors.formatting.map(\.argumentName)
 let internalArguments = Descriptors.internal.map(\.argumentName)

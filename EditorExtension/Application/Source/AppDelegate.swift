@@ -48,12 +48,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let options: Options
         do {
-            let configs = try parseConfigFile(data)
+            let configs = try parseConfigFile(data, format: configFormat(for: url))
 
             if configs.count > 1 {
                 showError(FormatError.options("""
-                SwiftFormat for Xcode doesn't support config files with segment headers, \
-                loaded first segment
+                SwiftFormat for Xcode doesn't support config files with multiple sections, \
+                loaded first section
                 """))
             }
 
@@ -134,7 +134,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let rules = RulesStore().rules.compactMap { $0.isEnabled ? $0.name : nil }
             let config = serialize(
                 options: Options(formatOptions: formatOptions, rules: Set(rules)),
-                swiftVersion: optionsStore.formatOptions.swiftVersion
+                swiftVersion: optionsStore.formatOptions.swiftVersion,
+                format: configFormat(for: url)
             ) + "\n"
             do {
                 try config.write(to: url, atomically: true, encoding: .utf8)
@@ -163,8 +164,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSOpenSavePanelDelegate {
     func panel(_: Any, shouldEnable url: URL) -> Bool {
         url.hasDirectoryPath ||
-            url.pathExtension == swiftFormatConfigurationFile.dropFirst() ||
-            url.lastPathComponent == swiftFormatConfigurationFile
+            ["swiftformat", "yml", "yaml"].contains(url.pathExtension.lowercased()) ||
+            swiftFormatConfigurationFiles.contains(url.lastPathComponent)
     }
 }
 

@@ -3555,6 +3555,423 @@ final class CommandLineTests: XCTestCase {
         }
     }
 
+    func testYAMLConfigFileDetected() throws {
+        for configFile in [".swiftformat.yml", ".swiftformat.yaml"] {
+            try withTmpDirectory([
+                configFile: "indent: 2\n",
+                "Foo.swift": "func foo() {\nbar()\n}\n",
+            ]) { directory in
+                CLI.print = { _, _ in }
+                XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .ok)
+                XCTAssertEqual(
+                    try String(contentsOf: directory.appendingPathComponent("Foo.swift")),
+                    "func foo() {\n  bar()\n}\n",
+                    configFile
+                )
+            }
+        }
+    }
+
+    func testMultipleConfigFilesInDirectoryIsAnError() throws {
+        for configFiles in [
+            [".swiftformat", ".swiftformat.yml"],
+            [".swiftformat", ".swiftformat.yaml"],
+            [".swiftformat.yml", ".swiftformat.yaml"],
+        ] {
+            var files = ["Sources/Foo.swift": "func foo() {\nbar()\n}\n"]
+            for configFile in configFiles {
+                files["Sources/\(configFile)"] = configFile.hasSuffix("swiftformat") ? "--indent 2\n" : "indent: 2\n"
+            }
+            try withTmpDirectory(files) { directory in
+                var errors = [String]()
+                CLI.print = { message, type in
+                    if type == .error {
+                        errors.append(message)
+                    }
+                }
+                XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .error)
+                XCTAssert(errors.contains(where: {
+                    $0.contains("Found multiple config files in") &&
+                        $0.contains("Sources: \(configFiles.joined(separator: ", ")).")
+                }), "\(errors)")
+                XCTAssertEqual(
+                    try String(contentsOf: directory.appendingPathComponent("Sources/Foo.swift")),
+                    "func foo() {\nbar()\n}\n"
+                )
+            }
+        }
+    }
+
+    func testMultipleConfigFilesIgnoredWithConfigArgument() throws {
+        try withTmpDirectory([
+            ".swiftformat": "--indent 2\n",
+            ".swiftformat.yml": "indent: 4\n",
+            "config.yml": "indent: 3\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: ". --config config.yml --rules indent --cache ignore --quiet"
+            ), .ok)
+            XCTAssertEqual(try String(contentsOf: directory.appendingPathComponent("Foo.swift")), "func foo() {\n   bar()\n}\n")
+        }
+    }
+
+    func testConfigFilesInDifferentFormatsInNestedDirectories() throws {
+        try withTmpDirectory([
+            ".swiftformat": "--indent 2\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+            "Sources/.swiftformat.yml": "indent: 4\n",
+            "Sources/Bar.swift": "func bar() {\nbaz()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .ok)
+            XCTAssertEqual(try String(contentsOf: directory.appendingPathComponent("Foo.swift")), "func foo() {\n  bar()\n}\n")
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Bar.swift")),
+                "func bar() {\n    baz()\n}\n"
+            )
+        }
+    }
+
+    func testYAMLConfigArgumentWithSections() throws {
+        try withTmpDirectory([
+            "config.yaml": """
+            indent: 2
+            sections:
+              - name: Tests
+                filter: "**/Tests/**"
+                indent: 4
+            """,
+            "Sources/Foo.swift": "func foo() {\nbar()\n}\n",
+            "Tests/FooTests.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: ". --config config.yaml --rules indent --cache ignore --quiet"
+            ), .ok)
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Foo.swift")),
+                "func foo() {\n  bar()\n}\n"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Tests/FooTests.swift")),
+                "func foo() {\n    bar()\n}\n"
+            )
+        }
+    }
+
+    func testDirectoryYAMLConfigFileWithSections() throws {
+        try withTmpDirectory([
+            ".swiftformat.yml": """
+            indent: 2
+            sections:
+              - name: Tests
+                filter: "**/Tests/**"
+                indent: 4
+            """,
+            "Sources/Foo.swift": "func foo() {\nbar()\n}\n",
+            "Tests/FooTests.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .ok)
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Foo.swift")),
+                "func foo() {\n  bar()\n}\n"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Tests/FooTests.swift")),
+                "func foo() {\n    bar()\n}\n"
+            )
+        }
+    }
+
+    func testInvalidYAMLConfigFileIsAnError() throws {
+        try withTmpDirectory([
+            ".swiftformat.yml": "exclude: **/Generated/**\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            var errors = [String]()
+            CLI.print = { message, type in
+                if type == .error {
+                    errors.append(message)
+                }
+            }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .error)
+            XCTAssert(errors.contains(where: {
+                $0.contains("Values starting with '*' must be quoted")
+            }), "\(errors)")
+        }
+    }
+
+    func testInferOptionsWritesYAMLConfigFile() throws {
+        try withTmpDirectory([
+            "Foo.swift": "func foo() {\n  bar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: "Foo.swift --infer-options --output .swiftformat.yml --quiet"
+            ), .ok)
+            let configURL = directory.appendingPathComponent(".swiftformat.yml")
+            let config = try parseConfigFile(Data(contentsOf: configURL), format: YAMLConfigFormat())
+            XCTAssertEqual(config.first?["indent"], "2")
+            XCTAssertFalse(try String(contentsOf: configURL).contains("--indent"))
+        }
+    }
+
+    func testInferOptionsWritesTextConfigFile() throws {
+        try withTmpDirectory([
+            "Foo.swift": "func foo() {\n  bar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: "Foo.swift --infer-options --output config.swiftformat --quiet"
+            ), .ok)
+            let config = try String(contentsOf: directory.appendingPathComponent("config.swiftformat"))
+            XCTAssert(config.contains("--indent 2\n"), config)
+        }
+    }
+
+    func testInferredYAMLAndTextConfigFilesFormatTheSame() throws {
+        let input = """
+        func foo( a:Int ) -> Int
+        {
+            let x=a;
+            if x>0 { return x }
+            return -x
+        }
+        """
+        try withTmpDirectory([
+            "Sample.swift": "func sample(_ value: Int) -> Int {\n  if value > 0 {\n    return value\n  }\n  return 0\n}\n",
+            "YAML/Input.swift": input,
+            "Text/Input.swift": input,
+        ]) { directory in
+            CLI.print = { _, _ in }
+            for output in ["inferred.yml", "inferred.swiftformat"] {
+                XCTAssertEqual(CLI.run(
+                    in: directory.path,
+                    with: "Sample.swift --infer-options --output \(output) --quiet"
+                ), .ok)
+            }
+            for (path, config) in [("YAML", "inferred.yml"), ("Text", "inferred.swiftformat")] {
+                XCTAssertEqual(CLI.run(
+                    in: directory.path,
+                    with: "\(path) --config \(config) --cache ignore --quiet"
+                ), .ok)
+            }
+            let yamlOutput = try String(contentsOf: directory.appendingPathComponent("YAML/Input.swift"))
+            XCTAssertNotEqual(yamlOutput, input)
+            XCTAssertEqual(yamlOutput, try String(contentsOf: directory.appendingPathComponent("Text/Input.swift")))
+        }
+    }
+
+    func testMultipleConfigFilesInNestedDirectoryIsAnError() throws {
+        try withTmpDirectory([
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+            "Sources/Nested/.swiftformat": "--indent 2\n",
+            "Sources/Nested/.swiftformat.yml": "indent: 4\n",
+            "Sources/Nested/Bar.swift": "func bar() {\nbaz()\n}\n",
+        ]) { directory in
+            var errors = [String]()
+            CLI.print = { message, type in
+                if type == .error {
+                    errors.append(message)
+                }
+            }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .error)
+            XCTAssert(errors.contains(where: { $0.contains("Nested: .swiftformat, .swiftformat.yml.") }), "\(errors)")
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Nested/Bar.swift")),
+                "func bar() {\nbaz()\n}\n"
+            )
+        }
+    }
+
+    func testMultipleConfigFilesWithBaseConfigArgumentIsAnError() throws {
+        try withTmpDirectory([
+            "base.yml": "indent: 3\n",
+            ".swiftformat": "--indent 2\n",
+            ".swiftformat.yml": "indent: 4\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            var errors = [String]()
+            CLI.print = { message, type in
+                if type == .error {
+                    errors.append(message)
+                }
+            }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: ". --base-config base.yml --rules indent --cache ignore --quiet"
+            ), .error)
+            XCTAssert(errors.contains(where: { $0.contains("Found multiple config files in") }), "\(errors)")
+        }
+    }
+
+    func testYAMLConfigFileExcludesPathsRelativeToDirectory() throws {
+        try withTmpDirectory([
+            "Sources/.swiftformat.yml": "exclude: [Generated]\nindent: 2\n",
+            "Sources/Generated/Foo.swift": "func foo() {\nbar()\n}\n",
+            "Sources/Bar.swift": "func bar() {\nbaz()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore --quiet"), .ok)
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Generated/Foo.swift")),
+                "func foo() {\nbar()\n}\n"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Sources/Bar.swift")),
+                "func bar() {\n  baz()\n}\n"
+            )
+        }
+    }
+
+    func testConfigArgumentExcludesPathsRelativeToConfigFile() throws {
+        for (configFile, contents) in [
+            ("Configs/swiftformat.yml", "exclude: [../Generated]\nindent: 2\n"),
+            ("Configs/config.swiftformat", "--exclude ../Generated\n--indent 2\n"),
+        ] {
+            try withTmpDirectory([
+                configFile: contents,
+                "Generated/Foo.swift": "func foo() {\nbar()\n}\n",
+                "Bar.swift": "func bar() {\nbaz()\n}\n",
+            ]) { directory in
+                CLI.print = { _, _ in }
+                XCTAssertEqual(CLI.run(
+                    in: directory.path,
+                    with: ". --config \(configFile) --rules indent --cache ignore --quiet"
+                ), .ok, configFile)
+                XCTAssertEqual(
+                    try String(contentsOf: directory.appendingPathComponent("Generated/Foo.swift")),
+                    "func foo() {\nbar()\n}\n",
+                    configFile
+                )
+                XCTAssertEqual(
+                    try String(contentsOf: directory.appendingPathComponent("Bar.swift")),
+                    "func bar() {\n  baz()\n}\n",
+                    configFile
+                )
+            }
+        }
+    }
+
+    func testYAMLAndTextConfigArgumentsAreMerged() throws {
+        try withTmpDirectory([
+            "a.yml": "indent: 3\nallman: true\n",
+            "b.swiftformat": "--indent 2\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(
+                in: directory.path,
+                with: "Foo.swift --config a.yml,b.swiftformat --rules indent,braces --cache ignore --quiet"
+            ), .ok)
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Foo.swift")),
+                "func foo()\n{\n  bar()\n}\n"
+            )
+        }
+    }
+
+    func testLintWithYAMLConfigFile() throws {
+        try withTmpDirectory([
+            ".swiftformat.yml": "indent: 2\n",
+            "Bad.swift": "func foo() {\n    bar()\n}\n",
+            "Good/Good.swift": "func foo() {\n  bar()\n}\n",
+        ]) { directory in
+            CLI.print = { _, _ in }
+            XCTAssertEqual(CLI.run(in: directory.path, with: "Bad.swift --lint --rules indent --cache ignore --quiet"), .lintFailure)
+            XCTAssertEqual(CLI.run(in: directory.path, with: "Good --lint --rules indent --cache ignore --quiet"), .ok)
+            XCTAssertEqual(
+                try String(contentsOf: directory.appendingPathComponent("Bad.swift")),
+                "func foo() {\n    bar()\n}\n"
+            )
+        }
+    }
+
+    func testUnknownOptionWarningInYAMLConfigFile() throws {
+        try withTmpDirectory([
+            ".swiftformat.yml": "unknown-options: warn\nfuture-option: value\nindent: 2\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            var warnings = [String]()
+            CLI.print = { message, type in
+                if type == .warning {
+                    warnings.append(message)
+                }
+            }
+            XCTAssertEqual(CLI.run(in: directory.path, with: ". --rules indent --cache ignore"), .ok)
+            XCTAssert(warnings.contains(where: {
+                $0.contains("Unknown option --future-option") && $0.contains("in configuration file")
+            }), "\(warnings)")
+            XCTAssertEqual(try String(contentsOf: directory.appendingPathComponent("Foo.swift")), "func foo() {\n  bar()\n}\n")
+        }
+    }
+
+    func testInvalidYAMLConfigArgumentIsAnError() throws {
+        try withTmpDirectory([
+            "config.yml": "indent: 2\n  linebreaks: lf\n",
+            "Foo.swift": "func foo() {\nbar()\n}\n",
+        ]) { directory in
+            var errors = [String]()
+            CLI.print = { message, type in
+                if type == .error {
+                    errors.append(message)
+                }
+            }
+            XCTAssertEqual(CLI.run(in: directory.path, with: "Foo.swift --config config.yml --cache ignore"), .error)
+            XCTAssert(errors.contains(where: {
+                $0.contains("Unexpected indentation on line 2 of configuration file")
+            }), "\(errors)")
+        }
+    }
+
+    func testStdinPathDiscoversYAMLConfigFile() throws {
+        try withTmpDirectory([
+            "Sources/.swiftformat.yml": "indent: 2\n",
+        ]) { directory in
+            var output = [String]()
+            CLI.print = { message, type in
+                switch type {
+                case .raw, .content:
+                    output.append(message)
+                case .error, .warning:
+                    XCTFail(message)
+                case .info, .success:
+                    break
+                }
+            }
+            var lines = ["func foo() {\n", "bar()\n", "}\n"]
+            CLI.readLine = { lines.isEmpty ? nil : lines.removeFirst() }
+            let path = directory.appendingPathComponent("Sources/Foo.swift").path
+            _ = processArguments(["", "stdin", "--stdin-path", path, "--rules", "indent"], in: directory.path)
+            XCTAssertEqual(output, ["func foo() {\n  bar()\n}\n"])
+        }
+    }
+
+    func testYAMLConfigFileWithSwiftVersionFile() throws {
+        for (config, expectedMessage) in [
+            ("swift-version: \"5.9\"\n", "Ignoring swift-version file"),
+            ("indent: 2\n", "Reading swift-version file"),
+        ] {
+            try withTmpDirectory([
+                ".swiftformat.yml": config,
+                ".swift-version": "6.0\n",
+                "Foo.swift": "let foo = 5\n",
+            ]) { directory in
+                var messages = [String]()
+                CLI.print = { message, _ in messages.append(message) }
+                XCTAssertEqual(CLI.run(in: directory.path, with: ". --verbose --rules indent --cache ignore"), .ok)
+                XCTAssert(messages.contains(where: { $0.contains(expectedMessage) }), "\(messages)")
+            }
+        }
+    }
+
     // MARK: Markdown
 
     func testFormatMarkdownFile() throws {

@@ -38,6 +38,9 @@ public let version = swiftFormatVersion
 /// The standard SwiftFormat config file name
 public let swiftFormatConfigurationFile = ".swiftformat"
 
+/// The names of the SwiftFormat config files that are detected automatically
+public let swiftFormatConfigurationFiles = [swiftFormatConfigurationFile, ".swiftformat.yml", ".swiftformat.yaml"]
+
 /// The standard Swift version file name
 public let swiftVersionFile = ".swift-version"
 
@@ -415,18 +418,26 @@ private func processDirectory(_ inputURL: URL, with options: inout Options, logg
 private func parseConfigArguments(in inputURL: URL, options: Options, logger: Logger?) throws -> [[String: String]] {
     var args = [[String: String]]()
     let manager = FileManager.default
-    let configFile = inputURL.appendingPathComponent(swiftFormatConfigurationFile)
-    if manager.fileExists(atPath: configFile.path) {
-        if let configURLs = options.configURLs {
+    let configFiles = swiftFormatConfigurationFiles.map(inputURL.appendingPathComponent).filter {
+        manager.fileExists(atPath: $0.path)
+    }
+    if let configURLs = options.configURLs {
+        for configFile in configFiles {
             let standardizedConfigFile = configFile.standardizedFileURL
             if !configURLs.contains(where: { $0.standardizedFileURL == standardizedConfigFile }) {
                 logger?.info("Ignoring config file at \(configFile.path)")
             }
-        } else {
-            logger?.info("Reading config file at \(configFile.path)")
-            let data = try Data(contentsOf: configFile)
-            args = try parseConfigFile(data, logger: logger)
         }
+    } else if configFiles.count > 1 {
+        throw FormatError.options("""
+        Found multiple config files in \(inputURL.path): \
+        \(configFiles.map(\.lastPathComponent).joined(separator: ", ")). Only one config file is \
+        supported per directory
+        """)
+    } else if let configFile = configFiles.first {
+        logger?.info("Reading config file at \(configFile.path)")
+        let data = try Data(contentsOf: configFile)
+        args = try parseConfigFile(data, format: configFormat(for: configFile), logger: logger)
     }
     let versionFile = inputURL.appendingPathComponent(swiftVersionFile)
     if manager.fileExists(atPath: versionFile.path) {

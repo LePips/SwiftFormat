@@ -33,6 +33,7 @@ Table of Contents
     - [Rules](#rules)
     - [Swift version](#swift-version)
     - [Config file](#config-file)
+        - [YAML config files](#yaml-config-files)
     - [Globs](#globs)
     - [Linting](#linting)
     - [Error codes](#error-codes)
@@ -813,6 +814,36 @@ If you would prefer not to edit the configuration file by hand, you can use the 
 ```bash
 $ cd /path/to/project
 $ swiftformat --infer-options . --output .swiftformat
+```
+
+### YAML config files
+
+A config file can also be written in YAML. Name it `.swiftformat.yml` or `.swiftformat.yaml` and it will be picked up automatically, just like a `.swiftformat` file.
+
+Lists can be written as YAML lists or as comma-delimited strings, and sections go under `sections`, each with a `filter` and an optional `name`:
+
+```yaml
+# format options
+allman: true
+indent: tab
+swift-version: "6.0"
+header: |
+  {file}
+  Copyright © {year} Acme
+
+# file options
+exclude: [Pods, "**/Generated"]
+
+# rules
+disable:
+  - elseOnSameLine
+  - semicolons
+
+sections:
+  - name: Tests
+    filter: "**/Tests/**"
+    enable: [noForceUnwrapInTests, noForceTryInTests]
+    indent: 2
 ```
 
 Globs
