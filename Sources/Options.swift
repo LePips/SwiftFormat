@@ -1511,7 +1511,8 @@ public struct Options {
     public var rules: Set<String>?
     public var configURLs: [URL]?
     public var lint: Bool
-    public var filterOptions: [[ConfigFilter]: [String: String]]
+    /// Arguments from `--filter`ed config file sections, in the order they should be applied
+    public var filterOptions: [(filters: [ConfigFilter], options: [String: String])]
 
     public static let `default` = Options(
         fileOptions: .default,
@@ -1526,7 +1527,7 @@ public struct Options {
                 rules: Set<String>? = nil,
                 configURLs: [URL]? = nil,
                 lint: Bool = false,
-                filterOptions: [[ConfigFilter]: [String: String]] = [:])
+                filterOptions: [(filters: [ConfigFilter], options: [String: String])] = [])
     {
         self.fileOptions = fileOptions
         self.formatOptions = formatOptions
