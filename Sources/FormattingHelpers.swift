@@ -1445,17 +1445,15 @@ extension Formatter {
             } else if spaceAfter, spaceBefore {
                 removeToken(at: index - 1)
             }
-        } else {
-            if tokenInsideParenRequiresSpacing(at: index - 1),
-               tokenOutsideParenRequiresSpacing(at: index)
-            {
-                if !spaceBefore, !spaceAfter {
-                    // Need to insert one
-                    insert(.space(" "), at: index)
-                }
-            } else if spaceBefore {
-                removeToken(at: index - 1)
+        } else if tokenInsideParenRequiresSpacing(at: index - 1),
+                  tokenOutsideParenRequiresSpacing(at: index)
+        {
+            if !spaceBefore, !spaceAfter {
+                // Need to insert one
+                insert(.space(" "), at: index)
             }
+        } else if spaceBefore {
+            removeToken(at: index - 1)
         }
     }
 

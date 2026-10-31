@@ -267,14 +267,12 @@ extension String {
                 } else {
                     currentWord.append(char)
                 }
+            } else if !currentWord.isEmpty, currentWord.last!.isNumber {
+                // Number→Letter transition: start a new word
+                words.append(currentWord)
+                currentWord = String(char)
             } else {
-                if !currentWord.isEmpty, currentWord.last!.isNumber {
-                    // Number→Letter transition: start a new word
-                    words.append(currentWord)
-                    currentWord = String(char)
-                } else {
-                    currentWord.append(char)
-                }
+                currentWord.append(char)
             }
         }
 

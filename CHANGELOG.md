@@ -1,5 +1,22 @@
 # Change Log
 
+## [0.64.5](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.64.5) (2026-10-31)
+
+- Fixed filtered config sections applying to files that do not match, and made matching sections apply in order
+- Improved handling of `unsafe` in for loops and expression parsing
+- Fixed `unusedArguments` removing arguments referenced by lifetime attributes
+- Fixed `redundantEquatable` removing `==` when stored properties are conditionally compiled
+- Fixed `preferForLoop` converting `forEach` calls used as expressions
+- Fixed `noForceUnwrapInTests` converting force unwraps inside key paths
+- Fixed `hoistTry` placement around comments, member chains after closures, and multiline declarations
+- Fixed `environmentEntry` placing default values after attributes on separate lines
+- Fixed `braces` joining closure statements onto preceding closing braces
+- Fixed `redundantClosure` treating parentheses on a new line as a call
+- Fixed `redundantReturn` removing early returns in branches ending with `throw`
+- Fixed `extensionAttributes` doubling comment indentation after removed attributes
+- Updated `duplicateImports` to remove ordinary duplicate imports across code boundaries
+- Fixed `docComments` leaving trailing spaces when converting documentation comments
+
 ## [0.64.4](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.64.4) (2026-10-27)
 
 - Fixed `redundantReturn` removing required returns when nested conditional branches all throw
